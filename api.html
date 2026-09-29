@@ -1,0 +1,6 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vidora API</title><link rel="stylesheet" href="/assets/app.css"></head><body><div style="max-width:900px;margin:50px auto;padding:18px"><a href="/" class="ghost-btn">← Workspace</a><h1 style="font-size:48px;letter-spacing:-3px">Vidora API</h1><p style="color:#858c9d">Programatik medya işlemleri için API v1.</p><div class="settings-card"><h3>Authentication</h3><p>Hesabından bir API key oluştur ve <code>X-API-Key</code> header'ında gönder.</p><pre style="color:#a99dff">POST /api/v1/download
+GET  /api/v1/status/:job_id
+GET  /api/v1/analyze?url=...</pre></div><div class="settings-card"><h3>Example</h3><pre style="color:#8c95a6">curl -X POST https://YOUR-DOMAIN/api/v1/download \\
+  -H "X-API-Key: vk_live_..." \\
+  -H "Content-Type: application/json" \\
+  -d '{"url":"https://...","quality":"1080","container":"mp4"}'</pre></div><div class="settings-card"><h3>Your API keys</h3><button class="primary-btn" id="newKey">Yeni key oluştur</button><pre id="out" style="white-space:pre-wrap;color:#a99dff"></pre></div></div><script>newKey.onclick=async()=>{const r=await fetch('/api/keys',{method:'POST'});const d=await r.json();out.textContent=d.key||d.error}</script></body></html>

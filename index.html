@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08090e">
+<meta name="description" content="Vidora — medya indirme, dönüştürme, klip ve araç çalışma alanı.">
+<link rel="manifest" href="/assets/manifest.json">
+<title>Vidora Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-mark">V</div><div><b>Vidora</b><span>Studio</span></div></div>
+    <nav class="side-nav">
+      <button class="nav-item active" data-view="home"><span>⌂</span> Ana Sayfa</button>
+      <button class="nav-item" data-view="library"><span>▦</span> Library</button>
+      <button class="nav-item" data-view="queue"><span>↯</span> Queue <em id="queueBadge">0</em></button>
+      <button class="nav-item" data-view="tools"><span>✦</span> Tools</button>
+      <button class="nav-item" data-view="profiles"><span>◉</span> Presets</button>
+      <button class="nav-item" data-view="settings"><span>⚙</span> Settings</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="status-card"><i></i><div><b>System online</b><span>Vidora V4.1</span></div></div>
+      <a href="/api" class="api-link">Developer API ↗</a>
+      <a href="/admin" class="api-link">Admin ↗</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn mobile-menu" id="mobileMenu">☰</button>
+      <div class="crumb">Vidora <span>/</span> <b id="viewTitle">Workspace</b></div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeButton" title="Tema">◐</button>
+        <button class="user-pill" id="accountButton"><span class="avatar">G</span><span id="accountLabel">Guest</span></button>
+      </div>
+    </header>
+
+    <section class="view active" id="view-home">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">SMART MEDIA WORKSPACE <i></i></div>
+          <h1>Videonu <span>indir.</span><br>Dönüştür. <span>Üret.</span></h1>
+          <p>Tek bağlantıdan video, ses, altyazı, thumbnail ve klip. Kendi dosyanı da dönüştür; tüm işleri tek bir çalışma alanında yönet.</p>
+          <div class="hero-pills"><span>YouTube</span><span>TikTok</span><span>Instagram</span><span>X</span><span>Reddit</span><span>Vimeo</span></div>
+        </div>
+        <div class="hero-metrics"><div><b id="metricActive">0</b><span>Active jobs</span></div><div><b id="metricDone">0</b><span>Library files</span></div><div><b id="metricQueue">0</b><span>Queue</span></div></div>
+      </div>
+
+      <div class="workspace-card">
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode-tab="download">DOWNLOAD</button>
+          <button class="mode-tab" data-mode-tab="convert">CONVERT</button>
+          <button class="mode-tab" data-mode-tab="clip">CLIP</button>
+          <button class="mode-tab" data-mode-tab="tools">TOOLS</button>
+        </div>
+
+        <div class="mode-panel active" id="panel-download">
+          <div class="url-row" id="dropZone">
+            <div class="url-icon">↗</div>
+            <input id="url" placeholder="Video bağlantısını yapıştır veya sürükleyip bırak..." autocomplete="off" spellcheck="false">
+            <button class="ghost-btn" id="pasteBtn">Yapıştır</button>
+            <button class="primary-btn" id="analyzeBtn">Smart Analyze</button>
+          </div>
+          <div class="url-hints"><span>Ctrl+K komut paleti</span><span>Enter analiz</span><span>TXT ile batch</span></div>
+          <div class="detected" id="detectedBar"></div>
+
+          <div class="analyze-result" id="analyzeResult">
+            <div class="media-head">
+              <div class="thumb-frame"><img id="thumb" alt="Thumbnail"><div class="thumb-fallback">▶</div></div>
+              <div class="media-meta"><div class="tag-row"><span class="tag purple" id="platformTag">Video</span><span class="tag" id="kindTag">VIDEO</span></div><h3 id="videoTitle">Video</h3><p id="videoSub">—</p><div class="spec-row" id="specRow"></div></div>
+              <div style="display:flex;gap:6px"><button class="icon-btn" id="previewBtn" title="Önizleme">▶</button><button class="icon-btn" id="downloadThumb" title="Thumbnail">▣</button></div>
+            </div>
+
+            <div class="recommend-box" id="recommendBox"><div><b>Smart recommendation</b><span id="recommendText">720p MP4 · uyumluluk + kalite dengesi</span></div><button class="tiny-btn" id="applyRecommendation">Uygula</button></div>
+
+            <div class="advanced-grid">
+              <div><label>Video</label><div class="segmented" id="videoQualities"><button data-q="1080">1080p</button><button class="active" data-q="720">720p</button><button data-q="480">480p</button><button data-q="360">360p</button><button data-q="best">BEST</button></div></div>
+              <div><label>Container</label><select id="container"><option>mp4</option><option>webm</option><option>mkv</option><option>mov</option></select></div>
+              <div><label>Audio mode</label><select id="audioFormat"><option value="">Video + audio</option><option value="mp3">MP3</option><option value="m4a">M4A</option><option value="aac">AAC</option><option value="opus">OPUS</option></select></div>
+              <div><label>Subtitle</label><select id="subtitleLang"><option value="">No subtitle</option></select></div>
+              <div class="check-cell"><label><input type="checkbox" id="subtitleEmbed"> Videoya göm</label></div>
+              <div><label>Naming</label><input class="mini-input" id="naming" value="{title}-{quality}.{ext}"></div>
+            </div>
+
+            <div class="advanced-toggle"><button id="advancedToggle">+ Gelişmiş seçenekler</button></div>
+            <div class="advanced-more" id="advancedMore">
+              <div><label>Codec</label><select id="codec"><option>Auto</option><option>H.264</option><option>H.265</option><option>VP9</option><option>AV1</option></select></div>
+              <div><label>Preset</label><select id="preset"><option value="phone">Telefon</option><option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="archive">Archive</option><option value="hq">High Quality</option></select></div>
+              <div><label>Trim start (sec)</label><input class="mini-input" id="trimStart" type="number" min="0" placeholder="0"></div>
+              <div><label>Trim end (sec)</label><input class="mini-input" id="trimEnd" type="number" min="0" placeholder="Auto"></div>
+            </div>
+
+            <div class="chapter-box" id="chapterBox"></div>
+            <div class="subtitle-box" id="subtitleBox"></div>
+
+            <div class="action-row"><button class="primary-btn huge" id="downloadBtn">İndirmeyi Başlat</button><button class="ghost-square" id="copyBtn">⧉</button><button class="ghost-square" id="shareBtn">↗</button></div>
+          </div>
+        </div>
+
+        <div class="mode-panel" id="panel-convert">
+          <div class="drop-upload" id="convertDrop"><div class="big-icon">⇪</div><h3>Dosyanı buraya bırak</h3><p>MP4, MKV, MOV, WEBM, MP3 ve daha fazlası.</p><input type="file" id="convertFile" hidden><button class="primary-btn" id="chooseConvert">Dosya seç</button></div>
+          <div class="convert-controls"><select id="convertMode"><option value="video">Video</option><option value="audio">Audio</option></select><select id="convertTarget"><option>mp4</option><option>webm</option><option>mkv</option><option>mov</option><option>mp3</option><option>m4a</option><option>wav</option><option>aac</option><option>opus</option></select><button class="primary-btn" id="convertBtn">Dönüştür</button></div>
+          <div id="convertResult" class="tool-result"></div>
+        </div>
+
+        <div class="mode-panel" id="panel-clip">
+          <div class="drop-upload"><div class="big-icon">✂</div><h3>Video klibi oluştur</h3><p>Bir video yükle, başlangıç ve bitişi seç.</p><input type="file" id="clipFile" hidden><button class="primary-btn" id="chooseClip">Video seç</button></div>
+          <div class="convert-controls"><input class="mini-input" id="clipStart" type="number" min="0" value="0" placeholder="Başlangıç (sn)"><input class="mini-input" id="clipEnd" type="number" min="0" placeholder="Bitiş (sn)"><button class="primary-btn" id="clipBtn">Clip oluştur</button></div>
+          <div id="clipResult" class="tool-result"></div>
+        </div>
+
+        <div class="mode-panel" id="panel-tools">
+          <div class="tool-grid">
+            <button class="tool-card" data-tool="playlist"><b>Playlist Lab</b><span>Playlist'i analiz et, tek tek seç.</span></button>
+            <button class="tool-card" data-tool="batch"><b>Batch Lab</b><span>TXT/çoklu URL ile toplu görev oluştur.</span></button>
+            <button class="tool-card" data-tool="thumbnail"><b>Thumbnail</b><span>Kapak görselini yüksek kalitede al.</span></button>
+            <button class="tool-card" data-tool="subtitle"><b>Subtitle Studio</b><span>SRT / VTT seçeneklerini yönet.</span></button>
+            <button class="tool-card" data-tool="metadata"><b>Metadata</b><span>Dosya özelliklerini incele.</span></button>
+            <button class="tool-card" data-tool="local"><b>Local Mode</b><span>Dosyayı sunucuya göndermeden işle.</span></button>
+          </div>
+          <div class="tool-result" id="toolsResult"></div>
+        </div>
+      </div>
+
+      <section class="section-block"><div class="section-title"><div><span>WORKFLOW</span><h2>Bir workspace gibi çalış.</h2></div><p>İşini bölme. Linkten çıktıya kadar tüm araçlar aynı yerde.</p></div><div class="feature-grid"><article><i>01</i><h3>Smart Analyze</h3><p>Platform, içerik tipi, çözünürlük, FPS, codec, chapter ve altyazıları keşfet.</p></article><article><i>02</i><h3>Adaptive Download</h3><p>Telefon, sosyal medya, arşiv ve yüksek kalite preset'leriyle tek tıkta ayar uygula.</p></article><article><i>03</i><h3>Process & Share</h3><p>Klip oluştur, dönüştür, metadata incele ve süreli paylaşım linki oluştur.</p></article></div></section>
+      <section class="section-block"><div class="section-title"><div><span>FAQ</span><h2>Vidora nasıl çalışıyor?</h2></div></div><div class="faq-grid"><details><summary>Dosyalar ne kadar tutuluyor?</summary><p>Varsayılan iş saklama süresi kısa tutulur. Admin ortam değişkeniyle ayarlanabilir.</p></details><details><summary>Hesap açmak zorunlu mu?</summary><p>Temel işler guest olarak kullanılabilir; Library, presets ve API key gibi özellikler hesapla çalışır.</p></details><details><summary>API var mı?</summary><p>Evet. /api sayfasından endpoint'leri görebilir, hesabından API anahtarı oluşturabilirsin.</p></details></div></section>
+    </section>
+
+    <section class="view" id="view-library"><div class="view-head"><div><span>LIBRARY</span><h2>İndirme geçmişin</h2></div><button class="ghost-btn" id="clearHistory">Geçmişi temizle</button></div><div class="library-toolbar"><input id="librarySearch" placeholder="Ara..."><select id="libraryFilter"><option value="all">Tümü</option><option value="download">Video</option><option value="batch">Batch</option></select></div><div id="libraryList" class="library-list"></div></section>
+
+    <section class="view" id="view-queue"><div class="view-head"><div><span>QUEUE</span><h2>Aktif işler</h2></div><div class="row-actions"><button class="ghost-btn" id="pauseAll">Pause all</button><button class="ghost-btn" id="resumeAll">Resume all</button><button class="ghost-btn" id="cancelAll">Cancel all</button><button class="ghost-btn" id="refreshQueue">Yenile</button></div></div><div id="queueList" class="queue-list"></div></section>
+
+    <section class="view" id="view-tools"><div class="view-head"><div><span>TOOLS</span><h2>Vidora araçları</h2></div></div><div class="tools-page-grid"><button data-mode-tab-jump="convert"><b>Converter</b><span>Video veya audio format değiştir.</span></button><button data-mode-tab-jump="clip"><b>Clip Maker</b><span>Belirli bir bölümü çıkar.</span></button><button data-tool-page="playlist"><b>Playlist</b><span>Playlist içeriğini seç.</span></button><button data-tool-page="batch"><b>Batch</b><span>Birden fazla linki sırala.</span></button><button data-tool-page="thumbnail"><b>Thumbnail</b><span>Kapak görselini al.</span></button><button data-tool-page="metadata"><b>Metadata</b><span>Dosya bilgilerini incele.</span></button></div><div class="tools-console" id="toolsConsole"></div></section>
+
+    <section class="view" id="view-profiles"><div class="view-head"><div><span>PRESETS</span><h2>Download profiles</h2></div><button class="primary-btn" id="newProfile">+ Yeni preset</button></div><div id="profileList" class="profile-grid"></div></section>
+
+    <section class="view" id="view-settings"><div class="view-head"><div><span>SETTINGS</span><h2>Workspace ayarları</h2></div></div><div class="settings-grid"><div class="settings-card"><h3>Appearance</h3><label>Theme<select id="themeSelect"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select></label><label>Compact mode<input type="checkbox" id="compactMode"></label></div><div class="settings-card"><h3>Defaults</h3><label>Quality<select id="defaultQuality"><option>1080</option><option selected>720</option><option>480</option><option>360</option><option>best</option></select></label><label>Container<select id="defaultContainer"><option>mp4</option><option>webm</option><option>mkv</option><option>mov</option></select></label></div><div class="settings-card"><h3>Keyboard</h3><p>Ctrl+K command palette · Enter analyze · D download · Esc close.</p></div><div class="settings-card"><h3>Local Processing</h3><p>Tarayıcı tarafı ön işlemler mümkünse cihazında tutulur. Büyük medya dönüşümleri sunucu FFmpeg'e yönlendirilir.</p></div></div></section>
+  </main>
+</div>
+
+<div class="bottom-nav"><button data-view="home">⌂<small>Ana</small></button><button data-view="library">▦<small>Library</small></button><button data-view="queue">↯<small>Queue</small></button><button data-view="tools">✦<small>Tools</small></button><button data-view="settings">⚙<small>Ayarlar</small></button></div>
+<div class="toast" id="toast"></div>
+<div class="command-overlay" id="commandOverlay"><div class="command"><div class="command-head"><input id="commandInput" placeholder="Vidora'da ara..."><button id="closeCommand">Esc</button></div><div id="commandResults"></div></div></div>
+<div class="modal" id="modal"><div class="modal-inner" id="modalInner"></div></div>
+
+<script src="/assets/frontend.js"></script>
+</body>
+</html>

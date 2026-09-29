@@ -1,0 +1,12 @@
+Flask>=3.0,<4
+Flask-Cors>=5.0,<7
+Flask-SQLAlchemy>=3.1,<4
+Flask-Limiter>=3.8,<5
+gunicorn>=23,<24
+yt-dlp>=2026.8.0
+requests>=2.32,<3
+imageio-ffmpeg>=0.6,<1
+psycopg2-binary>=2.9,<3
+redis>=6,<7
+
+qrcode[pil]>=8,<9
