@@ -1,6 +1,7 @@
 import json, os, re, shutil, subprocess
 from pathlib import Path
 import yt_dlp
+from yt_dlp.utils import DownloadError
 from platforms_service import detect_platform, normalize_url
 from storage_service import job_dir
 from queue_service import is_paused
@@ -10,27 +11,75 @@ try:
 except Exception:
     imageio_ffmpeg = None
 
-def _ydl_network_options(url: str):
-    """Return yt-dlp network options tuned for sites with browser/TLS fingerprinting.
+def _youtube_fallback_options():
+    """Use YouTube clients that do not depend on the normal webpage request.
 
-    TikTok has recently used browser/WAF challenges that can require curl-cffi
-    browser impersonation. Keep impersonation scoped to TikTok instead of forcing
-    it for every provider.
+    YouTube increasingly serves anti-bot pages to datacenter IPs.  yt-dlp's
+    current extractor guidance recommends alternate Innertube clients and,
+    where available, a supported JS runtime/EJS setup.  This fallback avoids
+    passing browser credentials or cookies through the service.
     """
+    out = {
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android_vr,tv'],
+                'player_skip': ['webpage,configs'],
+            }
+        }
+    }
+    try:
+        if shutil.which('deno'):
+            out['js_runtimes'] = 'deno'
+    except Exception:
+        pass
+    return out
+
+
+def _ydl_network_options(url: str):
+    """Return yt-dlp network options tuned for browser/WAF-sensitive sites."""
     options = {}
     try:
         platform = detect_platform(url)
         if platform.get('key') == 'tiktok':
+            # curl-cffi impersonation is useful for TikTok's browser/WAF checks.
             options['impersonate'] = 'chrome'
     except Exception:
         pass
     return options
 
+
+def _is_youtube_bot_error(exc):
+    text = str(exc).lower()
+    markers = (
+        'sign in to confirm you’re not a bot',
+        "sign in to confirm you're not a bot",
+        'confirm you are not a bot',
+        'confirm you’re not a bot',
+        'webpage request',
+        'http error 429',
+    )
+    return any(marker in text for marker in markers)
+
+
 def _extract_info(url: str, options: dict):
+    normalized = normalize_url(url)
     merged = dict(options or {})
-    merged.update(_ydl_network_options(url))
-    with yt_dlp.YoutubeDL(merged) as ydl:
-        return ydl.extract_info(normalize_url(url), download=False)
+    merged.update(_ydl_network_options(normalized))
+    try:
+        with yt_dlp.YoutubeDL(merged) as ydl:
+            return ydl.extract_info(normalized, download=False)
+    except DownloadError as exc:
+        try:
+            is_youtube = detect_platform(normalized).get('key') == 'youtube'
+        except Exception:
+            is_youtube = False
+        if not is_youtube or not _is_youtube_bot_error(exc):
+            raise
+
+        fallback = dict(options or {})
+        fallback.update(_youtube_fallback_options())
+        with yt_dlp.YoutubeDL(fallback) as ydl:
+            return ydl.extract_info(normalized, download=False)
 
 def ffmpeg_bin():
     system = shutil.which('ffmpeg')
@@ -101,9 +150,20 @@ def thumbnail_download(url, target):
     target.mkdir(parents=True, exist_ok=True)
     normalized = normalize_url(url)
     thumb_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
-    thumb_opts.update(_ydl_network_options(normalized))
-    with yt_dlp.YoutubeDL(thumb_opts) as ydl:
-        info = ydl.extract_info(normalized, download=False)
+    try:
+        with yt_dlp.YoutubeDL({**thumb_opts, **_ydl_network_options(normalized)}) as ydl:
+            info = ydl.extract_info(normalized, download=False)
+    except DownloadError as exc:
+        try:
+            is_youtube = detect_platform(normalized).get('key') == 'youtube'
+        except Exception:
+            is_youtube = False
+        if not is_youtube or not _is_youtube_bot_error(exc):
+            raise
+        fallback = dict(thumb_opts)
+        fallback.update(_youtube_fallback_options())
+        with yt_dlp.YoutubeDL(fallback) as ydl:
+            info = ydl.extract_info(normalized, download=False)
     thumb = info.get("thumbnail")
     if not thumb:
         raise RuntimeError("Thumbnail bulunamadı.")
@@ -179,9 +239,22 @@ def download(url, job, options, update):
             update(progress=100)
     opts['progress_hooks'] = [hook]
     final_opts = {k: v for k, v in opts.items() if v is not None}
-    final_opts.update(_ydl_network_options(url))
-    with yt_dlp.YoutubeDL(final_opts) as ydl:
-        info = ydl.extract_info(normalize_url(url), download=True)
+    normalized = normalize_url(url)
+    final_opts.update(_ydl_network_options(normalized))
+    try:
+        with yt_dlp.YoutubeDL(final_opts) as ydl:
+            info = ydl.extract_info(normalized, download=True)
+    except DownloadError as exc:
+        try:
+            is_youtube = detect_platform(normalized).get('key') == 'youtube'
+        except Exception:
+            is_youtube = False
+        if not is_youtube or not _is_youtube_bot_error(exc):
+            raise
+        fallback = dict(final_opts)
+        fallback.update(_youtube_fallback_options())
+        with yt_dlp.YoutubeDL(fallback) as ydl:
+            info = ydl.extract_info(normalized, download=True)
     files = [p for p in outdir.rglob('*') if p.is_file() and p.suffix.lower() not in {'.srt','.vtt','.ass','.lrc'}]
     if not files:
         raise RuntimeError('Dosya oluşturulamadı.')
