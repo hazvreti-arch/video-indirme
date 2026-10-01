@@ -12,20 +12,22 @@ except Exception:
     imageio_ffmpeg = None
 
 def _youtube_fallback_options():
-    """Use YouTube clients that do not depend on the normal webpage request.
+    """YouTube fallback using the current mweb client + PO Token provider.
 
-    YouTube increasingly serves anti-bot pages to datacenter IPs.  yt-dlp's
-    current extractor guidance recommends alternate Innertube clients and,
-    where available, a supported JS runtime/EJS setup.  This fallback avoids
-    passing browser credentials or cookies through the service.
+    yt-dlp currently recommends mweb for YouTube GVS requests when a PO Token
+    is needed. The bgutil-ytdlp-pot-provider plugin can mint the token through
+    its local script provider.
     """
     out = {
         'extractor_args': {
             'youtube': {
-                'player_client': ['android_vr,tv'],
-                'player_skip': ['webpage,configs'],
-            }
-        }
+                'player_client': ['mweb'],
+                'player_skip': ['webpage'],
+            },
+            'youtubepot-bgutilscript': {
+                'server_home': str(Path(__file__).resolve().parent / '.bgutil-ytdlp-pot-provider' / 'server')
+            },
+        },
     }
     try:
         if shutil.which('deno'):
@@ -33,7 +35,6 @@ def _youtube_fallback_options():
     except Exception:
         pass
     return out
-
 
 def _ydl_network_options(url: str):
     """Return yt-dlp network options tuned for browser/WAF-sensitive sites."""

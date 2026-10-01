@@ -131,7 +131,7 @@ def me():
 
 @app.get('/api/health')
 def health():
-    return jsonify({'ok':True,'version':'4.1','database':bool(db.engine),'worker':'threadpool','timestamp':int(time.time())})
+    return jsonify({'ok':True,'version':'4.4','database':bool(db.engine),'worker':'threadpool','timestamp':int(time.time())})
 
 @app.post('/api/analyze')
 @limiter.limit('30 per minute')

@@ -11,3 +11,4 @@ imageio-ffmpeg>=0.6,<1
 psycopg2-binary>=2.9,<3
 redis>=6,<7
 qrcode[pil]>=8,<9
+bgutil-ytdlp-pot-provider==2.0.0

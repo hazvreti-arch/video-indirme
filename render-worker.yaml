@@ -2,8 +2,17 @@ services:
   - type: worker
     name: vidora-worker
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python worker.py
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      mkdir -p /opt/render/project/src/.deno &&
+      DENO_INSTALL=/opt/render/project/src/.deno sh -c "curl -fsSL https://deno.land/install.sh | sh" &&
+      rm -rf /opt/render/project/src/.bgutil-ytdlp-pot-provider &&
+      git clone --depth 1 --branch 2.0.0 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/render/project/src/.bgutil-ytdlp-pot-provider &&
+      cd /opt/render/project/src/.bgutil-ytdlp-pot-provider/server &&
+      /opt/render/project/src/.deno/bin/deno install --allow-scripts=npm:canvas --frozen
+    startCommand: >-
+      export PATH="/opt/render/project/src/.deno/bin:$PATH" &&
+      python worker.py
     envVars:
       - key: VIDORA_SECRET_KEY
         sync: false
