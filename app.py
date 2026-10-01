@@ -131,7 +131,7 @@ def me():
 
 @app.get('/api/health')
 def health():
-    return jsonify({'ok':True,'version':'4.0','database':bool(db.engine),'worker':'threadpool','timestamp':int(time.time())})
+    return jsonify({'ok':True,'version':'4.1','database':bool(db.engine),'worker':'threadpool','timestamp':int(time.time())})
 
 @app.post('/api/analyze')
 @limiter.limit('30 per minute')
@@ -401,6 +401,10 @@ def revoke_api_key(kid):
 @app.get('/api/v1/analyze')
 def v1_analyze():
     if not api_key_user(): return jsonify({'error':'API key gerekli.'}),401
+    if request.args.get('url') and not request.is_json and not request.form:
+        data = {'url': request.args.get('url'), 'playlist': request.args.get('playlist', 'true').lower() not in {'0','false','no'}}
+        with app.test_request_context('/api/analyze', method='POST', json=data):
+            return api_analyze()
     return api_analyze()
 
 @app.post('/api/v1/download')

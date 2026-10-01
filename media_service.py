@@ -10,6 +10,28 @@ try:
 except Exception:
     imageio_ffmpeg = None
 
+def _ydl_network_options(url: str):
+    """Return yt-dlp network options tuned for sites with browser/TLS fingerprinting.
+
+    TikTok has recently used browser/WAF challenges that can require curl-cffi
+    browser impersonation. Keep impersonation scoped to TikTok instead of forcing
+    it for every provider.
+    """
+    options = {}
+    try:
+        platform = detect_platform(url)
+        if platform.get('key') == 'tiktok':
+            options['impersonate'] = 'chrome'
+    except Exception:
+        pass
+    return options
+
+def _extract_info(url: str, options: dict):
+    merged = dict(options or {})
+    merged.update(_ydl_network_options(url))
+    with yt_dlp.YoutubeDL(merged) as ydl:
+        return ydl.extract_info(normalize_url(url), download=False)
+
 def ffmpeg_bin():
     system = shutil.which('ffmpeg')
     if system:
@@ -43,8 +65,13 @@ def _formats(info):
 
 def analyze(url, playlist=True):
     url = normalize_url(url)
-    with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'noplaylist': not playlist, 'skip_download': True, 'extract_flat': False}) as ydl:
-        info = ydl.extract_info(url, download=False)
+    info = _extract_info(url, {
+        'quiet': True,
+        'no_warnings': True,
+        'noplaylist': not playlist,
+        'skip_download': True,
+        'extract_flat': False,
+    })
     entries = []
     if info.get('_type') == 'playlist':
         for e in info.get('entries') or []:
@@ -66,6 +93,37 @@ def analyze(url, playlist=True):
         'webpage_url': info.get('webpage_url') or url,
         'preview_url': info.get('url') or '',
     }
+
+def thumbnail_download(url, target):
+    """Download the best thumbnail URL exposed by yt-dlp and return its local path."""
+    from urllib.request import Request, urlopen
+    target = Path(target)
+    target.mkdir(parents=True, exist_ok=True)
+    normalized = normalize_url(url)
+    thumb_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
+    thumb_opts.update(_ydl_network_options(normalized))
+    with yt_dlp.YoutubeDL(thumb_opts) as ydl:
+        info = ydl.extract_info(normalized, download=False)
+    thumb = info.get("thumbnail")
+    if not thumb:
+        raise RuntimeError("Thumbnail bulunamadı.")
+    title = _safe_name(info.get("title") or "thumbnail")
+    lower = thumb.split("?", 1)[0].lower()
+    ext = ".jpg"
+    for candidate in (".png", ".webp", ".jpeg", ".jpg"):
+        if lower.endswith(candidate):
+            ext = candidate
+            break
+    out = target / f"{title[:120]}{ext}"
+    req = Request(thumb, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urlopen(req, timeout=30) as response, open(out, "wb") as fh:
+            fh.write(response.read())
+    except Exception as exc:
+        raise RuntimeError("Thumbnail indirilemedi.") from exc
+    if not out.exists() or out.stat().st_size == 0:
+        raise RuntimeError("Thumbnail indirilemedi.")
+    return out
 
 def _safe_name(s):
     s = re.sub(r'[\\/:*?"<>|]+', ' ', s or 'video')
@@ -120,7 +178,9 @@ def download(url, job, options, update):
         elif st == 'finished':
             update(progress=100)
     opts['progress_hooks'] = [hook]
-    with yt_dlp.YoutubeDL({k:v for k,v in opts.items() if v is not None}) as ydl:
+    final_opts = {k: v for k, v in opts.items() if v is not None}
+    final_opts.update(_ydl_network_options(url))
+    with yt_dlp.YoutubeDL(final_opts) as ydl:
         info = ydl.extract_info(normalize_url(url), download=True)
     files = [p for p in outdir.rglob('*') if p.is_file() and p.suffix.lower() not in {'.srt','.vtt','.ass','.lrc'}]
     if not files:
