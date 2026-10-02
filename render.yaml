@@ -7,7 +7,7 @@ services:
       mkdir -p /opt/render/project/src/.deno &&
       DENO_INSTALL=/opt/render/project/src/.deno sh -c "curl -fsSL https://deno.land/install.sh | sh" &&
       rm -rf /opt/render/project/src/.bgutil-ytdlp-pot-provider &&
-      git clone --depth 1 --branch 2.0.0 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/render/project/src/.bgutil-ytdlp-pot-provider &&
+      git clone --depth 1 --branch 2.0.1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/render/project/src/.bgutil-ytdlp-pot-provider &&
       cd /opt/render/project/src/.bgutil-ytdlp-pot-provider/server &&
       /opt/render/project/src/.deno/bin/deno install --allow-scripts=npm:canvas --frozen
     startCommand: >-

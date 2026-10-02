@@ -1,67 +1,114 @@
+import atexit
+import base64, hashlib, json, os, re, secrets, subprocess, time
+from datetime import timedelta
+from functools import wraps
+from pathlib import Path
+
+from flask import Flask, Response, jsonify, render_template, request, session, send_file, redirect, url_for
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash
+try:
+    import qrcode
+except Exception:
+    qrcode = None
+
+from config import DATABASE_URL, SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, PUBLIC_BASE_URL, MAX_BATCH_ITEMS, RATE_LIMIT_PER_MINUTE, DOWNLOAD_DIR
+from models import db, User, Job, History, Profile, APIKey, Ban, ShareLink, utcnow
+from auth_service import current_user, login_user, logout_user, is_banned
+from platforms_service import normalize_url, detect_platform, content_kind
+from media_service import analyze, download as media_download, convert_file, trim_file, probe_file, thumbnail_download, ffmpeg_bin
+from queue_service import submit, pause as pause_job, resume as resume_job
+from sharing_service import create_share, hash_token
 from storage_service import cleanup_files
 
-# Start a local BgUtils PO-token provider when the Render build has prepared it.
-# This keeps the YouTube token service inside the same web instance.
+app = Flask(__name__, template_folder=str(Path(__file__).resolve().parent), static_folder=str(None))
+app.config.update(SECRET_KEY=SECRET_KEY, SQLALCHEMY_DATABASE_URI=DATABASE_URL, SQLALCHEMY_TRACK_MODIFICATIONS=False, JSON_SORT_KEYS=False, MAX_CONTENT_LENGTH=2 * 1024 * 1024 * 1024)
+db.init_app(app)
+CORS(app, resources={r'/api/*': {'origins': '*'}})
+limiter = Limiter(key_func=get_remote_address, app=app, default_limits=[f'{RATE_LIMIT_PER_MINUTE} per minute'])
+# Optional local BgUtils PO-token provider for YouTube.
+# It is started only when the Render build has prepared the provider files.
+# The provider binds to localhost and is not exposed publicly.
 _PROVIDER_PROCESS = None
+_PROVIDER_LOG = None
 
 def _start_bgutil_provider():
-    global _PROVIDER_PROCESS
-    if os.environ.get("VIDORA_DISABLE_BGUTIL") == "1":
+    global _PROVIDER_PROCESS, _PROVIDER_LOG
+    if os.environ.get('VIDORA_DISABLE_BGUTIL') == '1':
+        print('[Vidora] BgUtils provider disabled by environment.')
         return
 
     root = Path(__file__).resolve().parent
-    deno = root / ".deno" / "bin" / "deno"
-    node_modules = root / ".bgutil-ytdlp-pot-provider" / "server" / "node_modules"
-    main_ts = root / ".bgutil-ytdlp-pot-provider" / "server" / "src" / "main.ts"
+    deno = root / '.deno' / 'bin' / 'deno'
+    server = root / '.bgutil-ytdlp-pot-provider' / 'server'
+    node_modules = server / 'node_modules'
+    main_ts = server / 'src' / 'main.ts'
 
     if not (deno.exists() and node_modules.exists() and main_ts.exists()):
-        print("[Vidora] BgUtils provider files not prepared; YouTube PO-token support is unavailable.")
+        print('[Vidora] BgUtils provider files not prepared; continuing without local PO-token HTTP provider.')
         return
 
     try:
-        log_path = Path("/tmp/vidora-bgutil.log")
-        log_file = log_path.open("a", encoding="utf-8")
+        _PROVIDER_LOG = open('/tmp/vidora-bgutil.log', 'a', encoding='utf-8')
         _PROVIDER_PROCESS = subprocess.Popen(
             [
-                str(deno), "run",
-                "--allow-env", "--allow-net", "--allow-ffi=.", "--allow-read=.",
-                "../src/main.ts",
-                "--host", "127.0.0.1",
-                "--port", "4416",
+                str(deno),
+                'run',
+                '--allow-env',
+                '--allow-net',
+                '--allow-ffi=.',
+                '--allow-read=.',
+                '../src/main.ts',
+                '--host', '127.0.0.1',
+                '--port', '4416',
             ],
             cwd=str(node_modules),
-            stdout=log_file,
-            stderr=log_file,
+            stdout=_PROVIDER_LOG,
+            stderr=_PROVIDER_LOG,
         )
 
-        # Wait briefly for the HTTP provider to become ready.
         import urllib.request
-        for _ in range(30):
+        import urllib.error
+        for _ in range(40):
+            if _PROVIDER_PROCESS.poll() is not None:
+                print(f'[Vidora] BgUtils provider exited early with code {_PROVIDER_PROCESS.returncode}.')
+                return
             try:
-                with urllib.request.urlopen("http://127.0.0.1:4416/ping", timeout=0.4) as response:
+                with urllib.request.urlopen('http://127.0.0.1:4416/ping', timeout=0.5) as response:
                     if response.status == 200:
-                        print("[Vidora] BgUtils PO-token provider ready on 127.0.0.1:4416")
+                        print('[Vidora] BgUtils PO-token provider ready on 127.0.0.1:4416')
                         return
-            except Exception:
+            except (OSError, urllib.error.URLError):
                 time.sleep(0.25)
 
-        print("[Vidora] BgUtils provider did not become ready; see /tmp/vidora-bgutil.log")
+        print('[Vidora] BgUtils provider did not become ready; see /tmp/vidora-bgutil.log')
     except Exception as exc:
-        print(f"[Vidora] Could not start BgUtils provider: {exc}")
-        _PROVIDER_PROCESS = None
+        print(f'[Vidora] Could not start BgUtils provider: {exc}')
 
 def _stop_bgutil_provider():
-    global _PROVIDER_PROCESS
+    global _PROVIDER_PROCESS, _PROVIDER_LOG
     if _PROVIDER_PROCESS is not None:
         try:
             _PROVIDER_PROCESS.terminate()
+            _PROVIDER_PROCESS.wait(timeout=3)
+        except Exception:
+            try:
+                _PROVIDER_PROCESS.kill()
+            except Exception:
+                pass
+        _PROVIDER_PROCESS = None
+    if _PROVIDER_LOG is not None:
+        try:
+            _PROVIDER_LOG.close()
         except Exception:
             pass
-        _PROVIDER_PROCESS = None
+        _PROVIDER_LOG = None
 
 _start_bgutil_provider()
 atexit.register(_stop_bgutil_provider)
-
 
 def json_or_form():
     if request.is_json:
@@ -164,7 +211,7 @@ def me():
 
 @app.get('/api/health')
 def health():
-    return jsonify({'ok':True,'version':'4.5','database':bool(db.engine),'worker':'threadpool','timestamp':int(time.time())})
+    return jsonify({'ok':True,'version':'4.4','database':bool(db.engine),'worker':'threadpool','timestamp':int(time.time())})
 
 @app.post('/api/analyze')
 @limiter.limit('30 per minute')
