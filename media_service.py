@@ -26,10 +26,12 @@ def _youtube_fallback_options():
             },
         },
         'js_runtimes': {
-            'deno': str(
-                Path(__file__).resolve().parent
-                / '.deno' / 'bin' / 'deno'
-            )
+            'deno': {
+                'path': str(
+                    Path(__file__).resolve().parent
+                    / '.deno' / 'bin' / 'deno'
+                )
+            }
         },
     }
 
