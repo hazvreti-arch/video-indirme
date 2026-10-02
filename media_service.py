@@ -12,29 +12,22 @@ except Exception:
     imageio_ffmpeg = None
 
 def _youtube_fallback_options():
-    """YouTube fallback using the current mweb client + PO Token provider.
-
-    yt-dlp currently recommends mweb for YouTube GVS requests when a PO Token
-    is needed. The bgutil-ytdlp-pot-provider plugin can mint the token through
-    its local script provider.
-    """
-    out = {
+    """yt-dlp options for YouTube with the local BgUtils PO-token provider."""
+    root = Path(__file__).resolve().parent
+    deno = root / '.deno' / 'bin' / 'deno'
+    return {
         'extractor_args': {
             'youtube': {
                 'player_client': ['mweb'],
-                'player_skip': ['webpage'],
             },
-            'youtubepot-bgutilscript': {
-                'server_home': str(Path(__file__).resolve().parent / '.bgutil-ytdlp-pot-provider' / 'server')
+            'youtubepot-bgutilhttp': {
+                'base_url': os.environ.get('BGUTIL_BASE_URL', 'http://127.0.0.1:4416'),
             },
         },
+        'js_runtimes': {
+            'deno': {'path': str(deno) if deno.exists() else None},
+        },
     }
-    try:
-        if shutil.which('deno'):
-            out['js_runtimes'] = 'deno'
-    except Exception:
-        pass
-    return out
 
 def _ydl_network_options(url: str):
     """Return yt-dlp network options tuned for browser/WAF-sensitive sites."""
@@ -66,6 +59,11 @@ def _extract_info(url: str, options: dict):
     normalized = normalize_url(url)
     merged = dict(options or {})
     merged.update(_ydl_network_options(normalized))
+    try:
+        if detect_platform(normalized).get('key') == 'youtube':
+            merged.update(_youtube_fallback_options())
+    except Exception:
+        pass
     try:
         with yt_dlp.YoutubeDL(merged) as ydl:
             return ydl.extract_info(normalized, download=False)
@@ -151,8 +149,14 @@ def thumbnail_download(url, target):
     target.mkdir(parents=True, exist_ok=True)
     normalized = normalize_url(url)
     thumb_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
+    primary_thumb_opts = {**thumb_opts, **_ydl_network_options(normalized)}
     try:
-        with yt_dlp.YoutubeDL({**thumb_opts, **_ydl_network_options(normalized)}) as ydl:
+        if detect_platform(normalized).get('key') == 'youtube':
+            primary_thumb_opts.update(_youtube_fallback_options())
+    except Exception:
+        pass
+    try:
+        with yt_dlp.YoutubeDL(primary_thumb_opts) as ydl:
             info = ydl.extract_info(normalized, download=False)
     except DownloadError as exc:
         try:
@@ -242,6 +246,11 @@ def download(url, job, options, update):
     final_opts = {k: v for k, v in opts.items() if v is not None}
     normalized = normalize_url(url)
     final_opts.update(_ydl_network_options(normalized))
+    try:
+        if detect_platform(normalized).get('key') == 'youtube':
+            final_opts.update(_youtube_fallback_options())
+    except Exception:
+        pass
     try:
         with yt_dlp.YoutubeDL(final_opts) as ydl:
             info = ydl.extract_info(normalized, download=True)
